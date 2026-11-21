@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     allow_private_destinations: bool = False  # SSRF guard; enable only for local dev/tests
     signing_secret: str | None = None  # if set, deliveries carry an HMAC-SHA256 signature
 
+    # --- Staying awake on Render's free tier ------------------------------
+    # Render fills in RENDER_EXTERNAL_URL itself, so on Render this is switched on automatically.
+    render_external_url: str | None = None
+    self_ping_interval_s: float = Field(300.0, gt=0)
+
     log_level: str = "INFO"
 
     @property

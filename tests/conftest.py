@@ -60,7 +60,8 @@ class LiveServer:
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]
         self.url = f"http://127.0.0.1:{self.port}"
-        config = uvicorn.Config(create_app(self.settings), host="127.0.0.1", port=self.port, log_level="warning")
+        self.app = create_app(self.settings)
+        config = uvicorn.Config(self.app, host="127.0.0.1", port=self.port, log_level="warning")
         self._server = uvicorn.Server(config)
         self._thread = threading.Thread(target=self._server.run, daemon=True)
 

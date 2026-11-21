@@ -13,6 +13,7 @@ from .config import Settings, get_settings
 from .db import create_db, create_tables
 from .delivery import build_client
 from .errors import install_error_handlers
+from .keepalive import keep_awake
 from .logging_setup import configure_logging, log
 from .ratelimit import SlidingWindowLimiter
 from .repository import Repository
@@ -36,17 +37,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.repo = Repository(session_factory)
         app.state.ingest_limiter = SlidingWindowLimiter()
         app.state.worker = None
-        worker_task: asyncio.Task | None = None
+        app.state.worker_task = None
+        keepalive_task: asyncio.Task | None = None
         if settings.run_worker:
             app.state.worker = Worker(session_factory, client, settings)
-            worker_task = asyncio.create_task(app.state.worker.run(), name="worker")
+            app.state.worker_task = asyncio.create_task(app.state.worker.run(), name="worker")
+        if settings.render_external_url:
+            keepalive_task = asyncio.create_task(
+                keep_awake(settings.render_external_url, settings.self_ping_interval_s), name="keepalive"
+            )
         log(logger, "app_started", run_worker=settings.run_worker, mock_receiver=settings.enable_mock_receiver)
         try:
             yield
         finally:
+            if keepalive_task is not None:
+                keepalive_task.cancel()
             if app.state.worker is not None:
                 app.state.worker.stop()
-                await worker_task  # drains in-flight deliveries, releases leases
+                await asyncio.gather(app.state.worker_task, return_exceptions=True)  # drains in-flight work
             await client.aclose()
             await engine.dispose()
 
@@ -89,10 +97,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await request.app.state.repo.ping()
         except Exception:
             return JSONResponse({"status": "unhealthy", "db": "down"}, 503)
-        worker = request.app.state.worker
-        return JSONResponse(
-            {"status": "ok", "db": "up", "worker": "running" if worker and worker.running else "disabled"}
-        )
+
+        # If the worker task has died, report unhealthy: the host's health check will then restart us.
+        worker_task = request.app.state.worker_task
+        if settings.run_worker and (worker_task is None or worker_task.done()):
+            return JSONResponse({"status": "unhealthy", "db": "up", "worker": "stopped"}, 503)
+        return JSONResponse({"status": "ok", "db": "up", "worker": "running" if settings.run_worker else "disabled"})
 
     @app.api_route("/", methods=["GET", "HEAD"], tags=["ops"], include_in_schema=False)
     async def root() -> dict:
