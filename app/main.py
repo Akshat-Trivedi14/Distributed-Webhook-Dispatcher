@@ -82,7 +82,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.enable_mock_receiver:
         app.include_router(mock_receiver.router)
 
-    @app.get("/health", tags=["ops"], summary="Liveness + database check")
+    # HEAD is allowed too, because uptime monitors usually check with HEAD requests.
+    @app.api_route("/health", methods=["GET", "HEAD"], tags=["ops"], summary="Liveness + database check")
     async def health(request: Request) -> JSONResponse:
         try:
             await request.app.state.repo.ping()
@@ -93,7 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             {"status": "ok", "db": "up", "worker": "running" if worker and worker.running else "disabled"}
         )
 
-    @app.get("/", tags=["ops"], include_in_schema=False)
+    @app.api_route("/", methods=["GET", "HEAD"], tags=["ops"], include_in_schema=False)
     async def root() -> dict:
         return {
             "service": "webhook-dispatcher",

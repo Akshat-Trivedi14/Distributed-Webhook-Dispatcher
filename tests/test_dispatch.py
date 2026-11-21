@@ -175,3 +175,7 @@ def test_job_abandoned_by_a_crashed_worker_is_recovered(api, server):
 def test_health_endpoint(api):
     body = api.get("/health").json()
     assert body == {"status": "ok", "db": "up", "worker": "running"}
+
+
+def test_health_accepts_head_requests_for_uptime_monitors(api):
+    assert api.head("/health").status_code == 200
