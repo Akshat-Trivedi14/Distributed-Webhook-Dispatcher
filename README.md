@@ -3,12 +3,12 @@
 FastAPI + PostgreSQL (SQLAlchemy) service that queues webhook events and delivers them in the background
 with exponential-backoff retries and per-domain rate limiting.
 
-**Live URL:** `https://<your-service>.onrender.com`  (Swagger docs at `/docs`)
+**Live URL:** `https://distributed-webhook-dispatcher-32n3.onrender.com`  (Swagger docs at `/docs`)
 
 ## Test the endpoints
 
 ```bash
-BASE=https://<your-service>.onrender.com
+BASE=https://distributed-webhook-dispatcher-32n3.onrender.com
 ```
 
 The service has a built-in fake customer server at `/mock/receiver`, so no outside server is needed.
